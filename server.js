@@ -33,81 +33,68 @@ const upload = multer({
 // =====================
 // CONVERT API
 // =====================
-const axios = require('axios');
+const axios = require("axios");
 
-app.post('/convert-url', async (req, res) => {
+app.post("/convert-url", async (req, res) => {
+  try {
+    const { imageUrl, format } = req.body;
 
-    try {
+    if (!imageUrl) {
+      return res.status(400).json({
+        error: "No image URL",
+      });
+    }
 
-        const { imageUrl, format } = req.body;
+    // Download image from Wix URL
+    const response = await axios({
+      url: imageUrl,
+      responseType: "arraybuffer",
+    });
 
-        if (!imageUrl) {
+    const outputFilename = Date.now() + "." + format;
 
-            return res.status(400).json({
-                error: 'No image URL'
-            });
-        }
+    const outputPath = path.join(__dirname, "converted", outputFilename);
 
-        // Download image from Wix URL
-        const response = await axios({
+    let image = sharp(response.data);
 
-            url: imageUrl,
-            responseType: 'arraybuffer'
+    switch (format) {
+      case "png":
+        image = image.png();
+        break;
+
+      case "jpg":
+      case "jpeg":
+        image = image.jpeg({
+          quality: 90,
         });
+        break;
 
-        const outputFilename =
-            Date.now() + '.' + format;
+      case "webp":
+        image = image.webp({
+          quality: 90,
+        });
+        break;
 
-        const outputPath =
-            path.join(
-                __dirname,
-                'converted',
-                outputFilename
-            );
+      case "avif":
+        image = image.avif();
+        break;
 
-        let image =
-            sharp(response.data);
-
-        switch(format) {
-
-            case 'png':
-                image = image.png();
-                break;
-
-            case 'jpg':
-                image = image.jpeg({
-                    quality: 90
-                });
-                break;
-
-            case 'webp':
-                image = image.webp({
-                    quality: 90
-                });
-                break;
-
-            case 'avif':
-                image = image.avif();
-                break;
-
-            default:
-                return res.status(400).json({
-                    error: 'Invalid format'
-                });
-        }
-
-        await image.toFile(outputPath);
-
-        res.download(outputPath);
-
-    } catch(err) {
-
-        console.error(err);
-
-        res.status(500).json({
-            error: 'Conversion failed'
+      default:
+        return res.status(400).json({
+          error: "Invalid format",
         });
     }
+
+    await image.toFile(outputPath);
+
+    res.download(outputPath);
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      error: "Conversion failed",
+    });
+  }
 });
 
 // =====================
