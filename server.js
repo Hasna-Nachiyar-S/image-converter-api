@@ -37,19 +37,25 @@ const axios = require("axios");
 
 app.post("/convert-url", async (req, res) => {
   try {
+    console.log("BODY:", req.body);
+
     const { imageUrl, format } = req.body;
 
-    if (!imageUrl) {
+    if (!imageUrl || !format) {
       return res.status(400).json({
-        error: "No image URL",
+        error: "Missing imageUrl or format",
       });
     }
 
-    // Download image from Wix URL
+    console.log("Downloading image from:", imageUrl);
+
     const response = await axios({
+      method: "GET",
       url: imageUrl,
       responseType: "arraybuffer",
     });
+
+    console.log("Image downloaded");
 
     const outputFilename = Date.now() + "." + format;
 
@@ -85,14 +91,18 @@ app.post("/convert-url", async (req, res) => {
         });
     }
 
+    console.log("Converting image...");
+
     await image.toFile(outputPath);
+
+    console.log("Conversion completed");
 
     res.download(outputPath);
   } catch (err) {
-    console.error(err);
+    console.error("BACKEND ERROR:", err);
 
     res.status(500).json({
-      error: "Conversion failed",
+      error: err.message,
     });
   }
 });
