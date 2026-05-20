@@ -67,11 +67,20 @@ app.post("/convert-url", async (req, res) => {
     console.log("FORMAT:", format);
 
     // DOWNLOAD IMAGE
+    console.log("Downloading image:", imageUrl);
     const response = await axios({
       method: "GET",
+
       url: imageUrl,
+
       responseType: "arraybuffer",
+
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Referer: "https://hasnanachiyars19.wixstudio.com",
+      },
     });
+    console.log("Download success");
 
     console.log("Image downloaded");
 
