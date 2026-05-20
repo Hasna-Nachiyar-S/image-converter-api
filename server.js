@@ -58,50 +58,38 @@ const upload = multer({
 // =====================
 const axios = require("axios");
 
-app.post("/convert-url", async (req, res) => {
+app.post("/convert-url", upload.single("image"), async (req, res) => {
   try {
-    console.log("BODY:", req.body);
 
-    const { imageUrl, format } = req.body;
+    const format = req.body.format;
 
-    if (!imageUrl || !format) {
+    if (!req.file || !format) {
       return res.status(400).json({
-        error: "Missing imageUrl or format",
+        error: "Missing image or format"
       });
     }
 
-    console.log("Downloading image from:", imageUrl);
-
-    const response = await axios({
-      method: "GET",
-      url: imageUrl,
-      responseType: "arraybuffer",
-    });
-
-    console.log("Image downloaded");
+    const inputPath = req.file.path;
 
     const outputFilename = Date.now() + "." + format;
 
     const outputPath = path.join(__dirname, "converted", outputFilename);
 
-    let image = sharp(response.data);
+    let image = sharp(inputPath);
 
     switch (format) {
+
       case "png":
         image = image.png();
         break;
 
       case "jpg":
       case "jpeg":
-        image = image.jpeg({
-          quality: 90,
-        });
+        image = image.jpeg({ quality: 90 });
         break;
 
       case "webp":
-        image = image.webp({
-          quality: 90,
-        });
+        image = image.webp({ quality: 90 });
         break;
 
       case "avif":
@@ -110,28 +98,30 @@ app.post("/convert-url", async (req, res) => {
 
       default:
         return res.status(400).json({
-          error: "Invalid format",
+          error: "Invalid format"
         });
     }
 
-    console.log("Converting image...");
-
     await image.toFile(outputPath);
 
-    console.log("Conversion completed");
-
     res.download(outputPath, () => {
+
+      fs.unlinkSync(inputPath);
+
       fs.unlinkSync(outputPath);
+
     });
+
   } catch (err) {
-    console.error("BACKEND ERROR:", err);
+
+    console.error(err);
 
     res.status(500).json({
-      error: err.message,
+      error: err.message
     });
+
   }
 });
-
 // =====================
 // START SERVER
 // =====================
