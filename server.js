@@ -56,16 +56,17 @@ const upload = multer({
 // =====================
 // CONVERT API
 // =====================
-const axios = require("axios");
+app.get("/", (req, res) => {
+  res.send("API WORKING");
+});
 
 app.post("/convert-url", upload.single("image"), async (req, res) => {
   try {
-
     const format = req.body.format;
 
     if (!req.file || !format) {
       return res.status(400).json({
-        error: "Missing image or format"
+        error: "Missing image or format",
       });
     }
 
@@ -78,7 +79,6 @@ app.post("/convert-url", upload.single("image"), async (req, res) => {
     let image = sharp(inputPath);
 
     switch (format) {
-
       case "png":
         image = image.png();
         break;
@@ -98,28 +98,29 @@ app.post("/convert-url", upload.single("image"), async (req, res) => {
 
       default:
         return res.status(400).json({
-          error: "Invalid format"
+          error: "Invalid format",
         });
     }
 
     await image.toFile(outputPath);
 
     res.download(outputPath, () => {
+      setTimeout(() => {
+        if (fs.existsSync(inputPath)) {
+          fs.unlinkSync(inputPath);
+        }
 
-      fs.unlinkSync(inputPath);
-
-      fs.unlinkSync(outputPath);
-
+        if (fs.existsSync(outputPath)) {
+          fs.unlinkSync(outputPath);
+        }
+      }, 3000);
     });
-
   } catch (err) {
-
     console.error(err);
 
     res.status(500).json({
-      error: err.message
+      error: err.message,
     });
-
   }
 });
 // =====================
