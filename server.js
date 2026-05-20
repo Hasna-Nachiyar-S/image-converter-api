@@ -1,12 +1,15 @@
 const express = require("express");
 const sharp = require("sharp");
 const cors = require("cors");
-const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
 
 const app = express();
+
+// =====================
+// CORS
+// =====================
 
 app.use(
   cors({
@@ -18,65 +21,67 @@ app.use(
 
 app.options(/.*/, cors());
 
+// =====================
+// JSON LIMIT
+// =====================
+
 app.use(
   express.json({
     limit: "20mb",
   }),
 );
 
-// CREATE FOLDERS IF MISSING
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
-}
+// =====================
+// CREATE FOLDERS
+// =====================
 
 if (!fs.existsSync("converted")) {
   fs.mkdirSync("converted");
 }
 
 // =====================
-// MULTER STORAGE
+// TEST ROUTE
 // =====================
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-
-  filename: function (req, file, cb) {
-    const uniqueName = Date.now() + path.extname(file.originalname);
-
-    cb(null, uniqueName);
-  },
-});
-
-const upload = multer({
-  storage: storage,
+app.get("/", (req, res) => {
+  res.send("API WORKING");
 });
 
 // =====================
 // CONVERT API
 // =====================
-app.get("/", (req, res) => {
-  res.send("API WORKING");
-});
 
-app.post("/convert-url", upload.single("image"), async (req, res) => {
+app.post("/convert-url", async (req, res) => {
   try {
-    const format = req.body.format;
+    console.log("REQ BODY:", req.body);
 
-    if (!req.file || !format) {
+    const { imageUrl, format } = req.body;
+
+    if (!imageUrl || !format) {
       return res.status(400).json({
-        error: "Missing image or format",
+        error: "Missing imageUrl or format",
       });
     }
 
-    const inputPath = req.file.path;
+    console.log("IMAGE URL:", imageUrl);
+    console.log("FORMAT:", format);
 
+    // DOWNLOAD IMAGE
+    const response = await axios({
+      method: "GET",
+      url: imageUrl,
+      responseType: "arraybuffer",
+    });
+
+    console.log("Image downloaded");
+
+    // OUTPUT FILE
     const outputFilename = Date.now() + "." + format;
 
     const outputPath = path.join(__dirname, "converted", outputFilename);
 
-    let image = sharp(inputPath);
+    // SHARP
+    let image = sharp(response.data);
 
     switch (format) {
       case "png":
@@ -85,11 +90,15 @@ app.post("/convert-url", upload.single("image"), async (req, res) => {
 
       case "jpg":
       case "jpeg":
-        image = image.jpeg({ quality: 90 });
+        image = image.jpeg({
+          quality: 90,
+        });
         break;
 
       case "webp":
-        image = image.webp({ quality: 90 });
+        image = image.webp({
+          quality: 90,
+        });
         break;
 
       case "avif":
@@ -102,27 +111,29 @@ app.post("/convert-url", upload.single("image"), async (req, res) => {
         });
     }
 
+    console.log("Converting image...");
+
     await image.toFile(outputPath);
 
+    console.log("Conversion complete");
+
+    // DOWNLOAD FILE
     res.download(outputPath, () => {
       setTimeout(() => {
-        if (fs.existsSync(inputPath)) {
-          fs.unlinkSync(inputPath);
-        }
-
         if (fs.existsSync(outputPath)) {
           fs.unlinkSync(outputPath);
         }
       }, 3000);
     });
   } catch (err) {
-    console.error(err);
+    console.error("BACKEND ERROR:", err);
 
     res.status(500).json({
       error: err.message,
     });
   }
 });
+
 // =====================
 // START SERVER
 // =====================
