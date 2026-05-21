@@ -88,7 +88,17 @@ app.post(
 
       const outputPath = path.join(__dirname, "converted", outputFilename);
 
-      let image = sharp(inputPath);
+      console.log(req.file.mimetype);
+      let image;
+
+      try {
+        image = sharp(inputPath);
+        await image.metadata();
+      } catch (e) {
+        return res.status(400).json({
+          error: "Unsupported or corrupted image",
+        });
+      }
 
       switch (format) {
         case "png":
