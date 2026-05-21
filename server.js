@@ -45,18 +45,24 @@ app.post(
 
   async (req, res) => {
     try {
-      console.log("FILE:", req.file);
+     console.log("FILE OBJECT:", req.file);
 
-      console.log("BODY:", req.body);
+console.log(
+    "BUFFER LENGTH:",
+    req.file.buffer.length
+);
 
-      if (!req.file || !req.body.format) {
-        return res.status(400).json({
-          error: "Missing image or format",
-        });
-      }
+console.log(
+    "MIME TYPE:",
+    req.file.mimetype
+);
 
-      console.log("MIME:", req.file.mimetype);
-
+console.log(
+    "FIRST 20 BYTES:",
+    req.file.buffer
+        .slice(0, 20)
+        .toString("hex")
+);
       // Validate image
       let image;
 
