@@ -2,8 +2,6 @@ const express = require("express");
 const sharp = require("sharp");
 const cors = require("cors");
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
 const app = express();
 
@@ -14,42 +12,19 @@ const app = express();
 app.use(
   cors({
     origin: "https://hasnanachiyars19.wixstudio.com",
-    methods: ["GET", "POST", "OPTIONS"],
   }),
 );
 
-app.options(/.*/, cors());
-
 // =====================
-// CREATE FOLDERS
+// MULTER MEMORY STORAGE
 // =====================
-
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
-}
-
-if (!fs.existsSync("converted")) {
-  fs.mkdirSync("converted");
-}
-
-// =====================
-// MULTER
-// =====================
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-
-  filename: function (req, file, cb) {
-    const uniqueName = Date.now() + path.extname(file.originalname);
-
-    cb(null, uniqueName);
-  },
-});
 
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
+
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
 });
 
 // =====================
@@ -74,32 +49,32 @@ app.post(
 
       console.log("BODY:", req.body);
 
-      const format = req.body.format;
-
-      if (!req.file || !format) {
+      if (!req.file || !req.body.format) {
         return res.status(400).json({
           error: "Missing image or format",
         });
       }
 
-      const inputPath = req.file.path;
+      console.log("MIME:", req.file.mimetype);
 
-      const outputFilename = Date.now() + "." + format;
-
-      const outputPath = path.join(__dirname, "converted", outputFilename);
-
-      console.log(req.file.mimetype);
+      // Validate image
       let image;
 
       try {
-        image = sharp(inputPath);
+        image = sharp(req.file.buffer);
+
         await image.metadata();
-      } catch (e) {
+      } catch (err) {
+        console.error("SHARP ERROR:", err);
+
         return res.status(400).json({
           error: "Unsupported or corrupted image",
         });
       }
 
+      const format = req.body.format;
+
+      // Convert
       switch (format) {
         case "png":
           image = image.png();
@@ -132,25 +107,17 @@ app.post(
           });
       }
 
-      await image.toFile(outputPath);
+      // Generate buffer
+      const outputBuffer = await image.toBuffer();
 
-      console.log("Conversion complete");
+      // Send file
+      res.set({
+        "Content-Type": `image/${format}`,
 
-      res.download(
-        outputPath,
+        "Content-Disposition": `attachment; filename=converted.${format}`,
+      });
 
-        () => {
-          setTimeout(() => {
-            if (fs.existsSync(inputPath)) {
-              fs.unlinkSync(inputPath);
-            }
-
-            if (fs.existsSync(outputPath)) {
-              fs.unlinkSync(outputPath);
-            }
-          }, 3000);
-        },
-      );
+      res.send(outputBuffer);
     } catch (err) {
       console.error("BACKEND ERROR:", err);
 
